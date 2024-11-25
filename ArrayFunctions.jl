@@ -1,5 +1,5 @@
 #***********************************************************************
-module array_functions
+module ArrayFunctions
 #***********************************************************************
 
 # MATH PACKAGES
@@ -8,8 +8,8 @@ using FFTW, Random
 using LinearAlgebra
 
 # CUSTOM PACKAGES
-using data_struct
-using base_io
+using .DataStruct
+using .BaseIO
 
 #***********************************************************************
 

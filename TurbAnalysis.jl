@@ -1,5 +1,5 @@
 #***********************************************************************
-module turb_analysis
+module TurbAnalysis
 #***********************************************************************
 
 # MATH PACKAGES
@@ -9,10 +9,10 @@ using LinearAlgebra
 using Images
 
 # CUSTOM PACKAGES
-using data_struct
-using base_io
-using array_functions
-using mhd_decomp
+using .DataStruct
+using .BaseIO
+using .ArrayFunctions
+using .DecompMHD
 
 #***********************************************************************
 

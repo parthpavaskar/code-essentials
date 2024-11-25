@@ -1,5 +1,5 @@
 #***********************************************************************
-module shockfind
+module ShockFind
 #***********************************************************************
 
 
@@ -28,15 +28,16 @@ using BenchmarkTools
 using ProgressMeter
 
 # CESSENTIALS
-using data_struct
-using base_io
-using array_functions
+using .DataStruct
+using .BaseIO
+using .ArrayFunctions
 
 #***********************************************************************
 
 export calc_convergence, calc_gradient, get_candidates
 export shock_remove, shock_remove_nodens, shock_remove_nodens_meanfill
 export shock_remove_v, shock_remove_jump
+
 #***********************************************************************
 
 

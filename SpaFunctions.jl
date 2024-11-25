@@ -1,5 +1,5 @@
 #***********************************************************************
-module spa_functions
+module SpaFunctions
 #***********************************************************************
 
 # MATH PACKAGES
@@ -9,14 +9,18 @@ using LinearAlgebra
 using Images
 
 # CUSTOM PACKAGES
-using data_struct
-using base_io
-using array_functions
-using mhd_decomp
+using .DataStruct
+using .BaseIO
+using .ArrayFunctions
+using .DecompMHD
 
 #***********************************************************************
 
-export los_integrate, get_stokes, get_stokes_w09, get_stokes_fr_emitting_layer, get_stokes_fr_emitting_layer_sm, get_stokes_fr_foreground_random, get_sxx, sxx_spap_fit, sxx_full_fit, get_spap_fit, get_full_fit, get_ξxx, get_yxx, linearize_sxx, s_fluct_array, spa_zhang
+export los_integrate 
+export get_stokes, get_stokes_w09, get_stokes_fr_emitting_layer
+export get_stokes_fr_emitting_layer_sm, get_stokes_fr_foreground_random
+export get_sxx, sxx_spap_fit, sxx_full_fit, get_spap_fit, get_full_fit
+export get_ξxx, get_yxx, linearize_sxx, s_fluct_array, spa_zhang
 export spa_zhang
 
 #***********************************************************************

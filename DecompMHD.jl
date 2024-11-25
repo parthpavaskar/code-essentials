@@ -1,5 +1,5 @@
 #***********************************************************************
-module mhd_decomp
+module DecompMHD
 #***********************************************************************
 
 # MATH PACKAGES
@@ -8,9 +8,9 @@ using FFTW, Random
 using LinearAlgebra
 
 # CUSTOM PACKAGES
-using data_struct
-using base_io
-using array_functions
+using .DataStruct
+using .BaseIO
+using .ArrayFunctions
 
 #***********************************************************************
 
