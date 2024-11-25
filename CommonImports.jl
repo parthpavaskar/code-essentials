@@ -9,10 +9,7 @@ using Interpolations, Polynomials, LinearAlgebra, StaticArrays
 using HDF5, DataFrames, Images, FortranFiles, DelimitedFiles
 
 # PLOTTING PACKAGES
-using PyPlot 
-using LaTeXStrings
-
-using PyCall
+using PyPlot, LaTeXStrings, PyCall
 
 # MULTI-THREADING
 using Base

@@ -25,6 +25,14 @@ export spa_zhang
 
 #***********************************************************************
 
+"""
+    Module SpaFunctions
+
+Functions for numerical tests of the SPA++ (modified Synchrotron Polarization Analysis)
+    perfromed in Pavaskar et al. (2024) [DOI: 10.3847/1538-4357/ad5af5].
+"""
+
+#***********************************************************************
 
 function los_integrate(a::Cube; dims=3)
     return reshape(sum(a, dims=dims), size(a)[1:2])
@@ -128,7 +136,7 @@ function get_sxx(I::Matx, Q::Matx, U::Matx)::Tuple{Vect, Vect, Float64}
         IQd2 = (I .+ Q_rot) ./ 2.0
         push!(sxx_iqd2, var(IQd2))
     end
-    return ϕ_arr, sxx_iqd2, ϕ_obs_mean
+    return ϕ_arr, sxx_iqd2
 end
 
 
@@ -136,9 +144,8 @@ sxx_spap_fit(x, p) = @.(p[1] + p[2]*sin(2*x) + p[3]*sin(4*x) + p[4]*cos(2*x) + p
 sxx_full_fit(x, p) = @.(p[1] + p[2]*sin(x) + p[3]*sin(2*x) + p[4]*sin(3*x) + p[5]*sin(4*x) + p[6]*cos(x) + p[7]*cos(2*x) + p[8]*cos(3*x) + p[9]*cos(4*x))
 
 function get_spap_fit(ϕ_s::Vect, s_xx::Vect)::Vect
-    cfit_xx = curve_fit(sxx_new_fit, ϕ_s, s_xx, [rand(5)...])
+    cfit_xx = curve_fit(sxx_spap_fit, ϕ_s, s_xx, [rand(5)...])
     return cfit_xx.param
-end
 end
 
 function get_full_fit(ϕ_s::Vect, s_xx::Vect)::Vect 
@@ -146,16 +153,74 @@ function get_full_fit(ϕ_s::Vect, s_xx::Vect)::Vect
     return cfit_xx.param   
 end
 
+struct SpaPlusParams
+    bx_in::Cube
+    by_in::Cube
+    bz_in::Cube
+    bx_in_A::Cube
+    by_in_A::Cube
+    bz_in_A::Cube
+    bx_in_F::Cube
+    by_in_F::Cube
+    bz_in_F::Cube
+    bx_in_S::Cube
+    by_in_S::Cube
+    bz_in_S::Cube
+end
 
+function spa_plus(nres::Integer, params::SpaPlusParams; 
+    lower_lim::Integer=20, upper_lim::Integer=80, diff::Integer=10,
+    sub_center::Bool=true, sub_i::Integer=1, sub_j::Integer=1,
+    k_inj::Integer=2, gam88::Bool=false)
+    ::Tuple{Array{Float64,3}, Array{Float64,3}, Array{Float64,3}}
 
+    gamma_r = collect(lower_lim:diff:upper_lim)
+    
+    # Add θ_λ = 88 deg instead of 90 deg to remove Alfven problem case
+    if gam88
+        push!(gamma_r, 88)
+    end
 
+    sub_r = div(nres, k_inj)
 
+    bx_ins = zeros(Float64, 4, nres, nres, nres)
+    by_ins = zeros(Float64, 4, nres, nres, nres)
+    bz_ins = zeros(Float64, 4, nres, nres, nres)
 
+    phi_s = zeros(Float64, 181, 4, length(gamma_r))
+    fpar_fn = zeros(Float64, 5, 4, length(gamma_r))
 
+    modes_str = ("B", "A", "F", "S")
 
+    bx_ins[1, :,:,:], by_ins[1, :,:,:], bz_ins[1, :,:,:] = params.bx_in, params.by_in, params.bz_in
+    bx_ins[2, :,:,:], by_ins[2, :,:,:], bz_ins[2, :,:,:] = params.bx_in_A, params.by_in_A, params.bz_in_A
+    bx_ins[3, :,:,:], by_ins[3, :,:,:], bz_ins[3, :,:,:] = params.bx_in_F, params.by_in_F, params.bz_in_F
+    bx_ins[4, :,:,:], by_ins[4, :,:,:], bz_ins[4, :,:,:] = params.bx_in_S, params.by_in_S, params.bz_in_S 
 
+    for (θ, val) in enumerate(gamma_r) 
+        print("Starting iteration θ_λ = ", val)
+        flush(stdout)
 
+        θ_λ = deg2rad(val)
+        for mode in 1:4
+            bx_rot, by_rot, bz_rot = vector_rotation(bx_ins[mode,:,:,:], 
+            by_ins[mode,:,:,:], bz_ins[mode,:,:,:], 0, θ_λ, 0)
 
+            ii_map, qq_map, uu_map = get_stokes(bx_rot, by_rot)
+            # ii_map, qq_map, uu_map = get_stokes_fr_foreground_random(bx_rot, by_rot, 50)
+            
+            ii_spt = sub_grid(ii_map, sub_r, center=sub_center, grid_i=sub_i, grid_j=sub_j)
+            qq_spt = sub_grid(qq_map, sub_r, center=sub_center, grid_i=sub_i, grid_j=sub_j)
+            uu_spt = sub_grid(uu_map, sub_r, center=sub_center, grid_i=sub_i, grid_j=sub_j)
+
+            phi_s[:,mode,θ], sxx_fn[:,mode,θ] = get_sxx(ii_spt, qq_spt, uu_spt)
+            fpar_fn[:,mode,θ] = get_spap_fit(phi_s[:,mode,θ], sxx_fn[:,mode,θ])
+        end
+        println("  .... done")
+        flush(stdout)
+    end
+    return phi_s, sxx_fn, fpar_fn
+end
 
 
 function get_ξxx(s_xx::Vect)::Float64
@@ -217,8 +282,11 @@ function spa_zhang(I::Vect, Q::Vect, U::Vect;
 
     s_xx = linearize_sxx!(ϕ_s, s_xx)
     s_fluct = s_fluct_array(ϕ_s, s_xx, Δϕ_s, θ_mean=θ_mean)
-    rxx_fit = curve_fit(s_model_zhang, Δϕ_s, s_fluct ,[rand(2)...])
+    rxx_fit = curve_fit(s_model_zhang, Δϕ_s, s_fluct, [rand(2)...])
 
     rxx = (rxx_fit.param[1] / rxx_fit.param[2]) * (2*sin(2*δθ) / sin(4*δθ))
     return rxx, ξ, y
 end
+
+
+end # top
