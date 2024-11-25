@@ -28,9 +28,9 @@ using BenchmarkTools
 using ProgressMeter
 
 # CESSENTIALS
-using .DataStruct
-using .BaseIO
-using .ArrayFunctions
+using DataStruct
+using BaseIO
+using ArrayFunctions
 
 #***********************************************************************
 

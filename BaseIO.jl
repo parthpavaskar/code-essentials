@@ -11,7 +11,7 @@ using LinearAlgebra
 using HDF5
 
 # CUSTOM PACKAGES
-using .DataStruct
+using DataStruct
 
 #***********************************************************************
 

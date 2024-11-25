@@ -8,8 +8,8 @@ using FFTW, Random
 using LinearAlgebra
 
 # CUSTOM PACKAGES
-using .DataStruct
-using .BaseIO
+using DataStruct
+using BaseIO
 
 #***********************************************************************
 

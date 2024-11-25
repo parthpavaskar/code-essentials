@@ -17,4 +17,4 @@ using FLoops
 
 # CUSTOM PACKAGES
 push!(LOAD_PATH, expanduser("/home/cronus/data/pavaskar/codes/code_essentials/"))
-using .DataStruct, .BaseIO, .ArrayFunctions, .TurbAnalysis, .DecompMHD, .ShockFind
+using DataStruct, BaseIO, ArrayFunctions, TurbAnalysis, DecompMHD, ShockFind

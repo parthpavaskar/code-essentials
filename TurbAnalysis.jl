@@ -9,10 +9,10 @@ using LinearAlgebra
 using Images
 
 # CUSTOM PACKAGES
-using .DataStruct
-using .BaseIO
-using .ArrayFunctions
-using .DecompMHD
+using DataStruct
+using BaseIO
+using ArrayFunctions
+using DecompMHD
 
 #***********************************************************************
 
