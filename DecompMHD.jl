@@ -23,7 +23,7 @@ export decomposition_A, decomposition_F, decomposition_S
         iv::Cube, jv::Cube, kv::Cube, 
         ib::Cube, jb::Cube, kb::Cube, 
         v_A::Float64, c_s::Float64; 
-        epsilon=1e-9::Float64, ρ_0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
+        epsilon=1e-9::Float64, ρ0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
 
 Decompose the velocity and magnetic field cubes into Alfvén mode components.
 
@@ -37,7 +37,7 @@ Decompose the velocity and magnetic field cubes into Alfvén mode components.
 - `v_A`: Alfvén velocity.
 - `c_s`: Sound speed.
 - `epsilon`: Small value to avoid division by zero (default: 1e-9).
-- `ρ_0`: Initial density (default: 1.0).
+- `ρ0`: Initial density (default: 1.0).
 
 # Returns
 - `iv_out, jv_out, kv_out`: The decomposed velocity components.
@@ -47,12 +47,12 @@ function decomposition_A(
     iv::Cube, jv::Cube, kv::Cube, 
     ib::Cube, jb::Cube, kb::Cube, 
     v_A::Float64, c_s::Float64; 
-    epsilon=1e-9::Float64, ρ_0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
+    epsilon=1e-9::Float64, ρ0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
     
     # Get the dimensions of the input cubes
     nx, ny, nz = size(ib)
     
-    # Calculate α = β / 2
+    # Calculate α = β * (γ / 2)
     α = c_s^2 / v_A^2
 
     # Perform FFT and shift the zero-frequency component to the center
@@ -64,8 +64,9 @@ function decomposition_A(
     vv_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
     bb_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
 
-    # Calculate the mean magnetic field unit vector
-    Bhat = normalize([mean(ib), mean(jb), mean(kb)])
+    # Calculate the mean magnetic field and unit vector
+    B0 = [mean(ib), mean(jb), mean(kb)]
+    Bhat = normalize(B0)
 
     for k in 1:nz, j in 1:ny, i in 1:nx
 
@@ -76,37 +77,41 @@ function decomposition_A(
         kx = i - div(nx, 2) - 1
         ky = j - div(ny, 2) - 1
         kz = k - div(nz, 2) - 1
-        khat = normalize([kx, ky, kz])
+        kk = [kx, ky, kz]
+        khat = normalize(kk)
 
         # Avoid zero wave vectors
-        if sum(khat .^ 2.0) > 0
-            # Calculate the dot product of khat and Bhat
-            kdotB = dot(khat, Bhat)
+        if sum(kk .^ 2.0) > 0
+            # Calculate the dot product of khat and Bhat (cosθ)
+            cosθ = dot(khat, Bhat)
 
             # Alfven mode wave speed
-            c_wave = v_A * kdotB
+            c_wave = v_A * cosθ
 
             # Induction equation denominator
-            ind_denom = c_wave * v_A * sqrt(ρ_0)
+            # ind_denom = c_wave * v_A * sqrt(ρ0)
             
-            if 1.0 - abs(kdotB) > epsilon
-				# Get the Alfven mode Fourier vector
-				# ζ_Alf = k x B
+            # Remove k_perp = 0 case
+            if 1.0 - abs(cosθ) > epsilon
+				#= 
+                Get the Alfven mode basis vector
+                ζ_Alf = k x B
+                =#
                 ζ_mode = normalize(cross(khat, Bhat))
 
                 # Get projected Fourier velocity vector
                 v_fft_out = dot(v_fft, ζ_mode) .* ζ_mode
 
-                # Assign the decomposed velocity components
-                vv_fft_out[i,j,k,:] = v_fft_out
-                
                 if abs(c_wave) > 0
                     # Get B-field Fourier components
-                    b_fft_out = cross(khat, cross(v_fft_out, Bhat)) ./ ind_denom
+                    b_fft_out = cross(khat, cross(v_fft_out, B0)) ./ c_wave
                 else
                     # Remove non-propagating modes
-                    b_fft_out = [0, 0, 0]
+                    b_fft_out = [0., 0., 0.]
                 end
+                
+                # Assign the decomposed velocity components
+                vv_fft_out[i,j,k,:] = v_fft_out
                 
                 # Assign the decomposed magnetic field components
                 bb_fft_out[i,j,k,:] = b_fft_out
@@ -132,7 +137,7 @@ end
         iv::Cube, jv::Cube, kv::Cube, 
         ib::Cube, jb::Cube, kb::Cube, 
         v_A::Float64, c_s::Float64; 
-        epsilon=1e-9::Float64, ρ_0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
+        epsilon=1e-9::Float64, ρ0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
 
 Decompose the velocity and magnetic field cubes into fast mode components.
 
@@ -146,7 +151,7 @@ Decompose the velocity and magnetic field cubes into fast mode components.
 - `v_A`: Alfvén velocity.
 - `c_s`: Sound speed.
 - `epsilon`: Small value to avoid division by zero (default: 1e-9).
-- `ρ_0`: Initial density (default: 1.0).
+- `ρ0`: Initial density (default: 1.0).
 
 # Returns
 - `iv_out, jv_out, kv_out`: The decomposed velocity components.
@@ -156,16 +161,16 @@ function decomposition_F(
     iv::Cube, jv::Cube, kv::Cube, 
     ib::Cube, jb::Cube, kb::Cube, 
     v_A::Float64, c_s::Float64; 
-    epsilon=1e-9::Float64, ρ_0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
+    epsilon=1e-9::Float64, ρ0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
     
     # Get the dimensions of the input cubes
     nx, ny, nz = size(ib)
     
-    # Calculate α = β / 2
+    # Calculate α = β * (γ / 2)
     α = c_s^2 / v_A^2
     
     # Factor for magnetosonic mode wave speeds
-    ms_factor = v_A^2 + c_s^2
+    ms_factor = v_A^2 + c_s^
 
     # Perform FFT and shift the zero-frequency component to the center
     iv_fft = fftshift(fft(iv))
@@ -176,8 +181,9 @@ function decomposition_F(
     vv_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
     bb_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
 
-    # Calculate the mean magnetic field vector
-    Bhat = normalize([mean(ib), mean(jb), mean(kb)])
+    # Calculate the mean magnetic field and unit vector
+    B0 = [mean(ib), mean(jb), mean(kb)]
+    Bhat = normalize(B0)
 
     for k in 1:nz, j in 1:ny, i in 1:nx
         
@@ -188,43 +194,45 @@ function decomposition_F(
         kx = i - div(nx, 2) - 1
         ky = j - div(ny, 2) - 1
         kz = k - div(nz, 2) - 1
-        khat = normalize([kx, ky, kz])
+        kk = [kx, ky, kz]
+        khat = normalize(kk)
 
         # Avoid zero wave vectors
-        if sum(khat .^ 2.0) > 0
-            # Calculate the dot product of khat and Bhat
-            kdotB = dot(khat, Bhat)
+        if sum(kk .^ 2.0) > 0
+            # Calculate the dot product of khat and Bhat (cosθ)
+            cosθ = dot(khat, Bhat)
 
             # Fast mode wave speed
-            Δ2 = (ms_factor)^2 - (4 * v_A^2 * c_s^2 * kdotB^2)
+            Δ2 = (ms_factor)^2 - (4.0 * v_A^2 * c_s^2 * cosθ^2)
             c_wave = sqrt(0.5 * (ms_factor + sqrt(Δ2)))
 
             # Induction equation denominator
-            ind_denom = c_wave * v_A * sqrt(ρ_0)
+            # ind_denom = c_wave * v_A * sqrt(ρ0)
             
-            D = (1 + α)^2 - (4 * α * kdotB^2)
-            prefactor_para = 1 - sqrt(D) - α
-            prefactor_perp = 1 + sqrt(D) + α
+            D = (1.0 + α)^2 - (4.0 * α * cosθ^2)
+            prefactor_para = - 1.0 + α + sqrt(D)
+            prefactor_perp = 1.0 + α + sqrt(D)
 
-            if 1.0 - abs(kdotB) > epsilon
+            # Remove k_perp = 0 case
+            if 1.0 - abs(cosθ) > epsilon
 				#= 
-                Get the fast mode Fourier vector
-                ζ_fast \propto (- 1 + sqrt(D) + alpha) * k_para + 
-                    (1 + sqrt(D) + alpha) * k_perp
+                Get the fast mode basis vector
+                ζ_fast ∝ (- 1 + α + sqrt(D)) * k_para + 
+                    (1 + α + sqrt(D)) * k_perp
                 =#
-                k_para = dot(khat, Bhat) .* Bhat
-                k_perp = khat .- k_para
-                ζ_mode = normalize((-prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
+                k_para = dot(kk, Bhat) .* Bhat
+                k_perp = kk .- k_para
+                ζ_mode = normalize((prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
 
                 # Get projected Fourier velocity vector
                 v_fft_out = dot(v_fft, ζ_mode) .* ζ_mode
 
                 if abs(c_wave) > 0
                     # Get B-field Fourier components
-                    b_fft_out = cross(khat, cross(v_fft_out, Bhat)) ./ ind_denom
+                    b_fft_out = cross(khat, cross(v_fft_out, B0)) ./ c_wave
                 else
                     # Remove non-propagating modes
-                    b_fft_out = [0, 0, 0]
+                    b_fft_out = [0., 0., 0.]
                 end
                 
                 # Assign the decomposed velocity components
@@ -254,7 +262,7 @@ end
         iv::Cube, jv::Cube, kv::Cube, 
         ib::Cube, jb::Cube, kb::Cube, 
         v_A::Float64, c_s::Float64; 
-        epsilon=1e-9::Float64, ρ_0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
+        epsilon=1e-9::Float64, ρ0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
 
 Decompose the velocity and magnetic field cubes into slow mode components.
 
@@ -268,7 +276,7 @@ Decompose the velocity and magnetic field cubes into slow mode components.
 - `v_A`: Alfvén velocity.
 - `c_s`: Sound speed.
 - `epsilon`: Small value to avoid division by zero (default: 1e-9).
-- `ρ_0`: Initial density (default: 1.0).
+- `ρ0`: Initial density (default: 1.0).
 
 # Returns
 - `iv_out, jv_out, kv_out`: The decomposed velocity components.
@@ -278,12 +286,12 @@ function decomposition_S(
     iv::Cube, jv::Cube, kv::Cube, 
     ib::Cube, jb::Cube, kb::Cube, 
     v_A::Float64, c_s::Float64; 
-    epsilon=1e-9::Float64, ρ_0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
+    epsilon=1e-9::Float64, ρ0=1.0::Float64)::Tuple{Cube,Cube,Cube,Cube,Cube,Cube}
     
     # Get the dimensions of the input cubes
     nx, ny, nz = size(ib)
     
-    # Calculate α = β / 2
+    # Calculate α = β * (γ / 2)
     α = c_s^2 / v_A^2
     
     # Factor for magnetosonic mode wave speeds
@@ -298,8 +306,9 @@ function decomposition_S(
     vv_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
     bb_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
 
-    # Calculate the mean magnetic field vector
-    Bhat = normalize([mean(ib), mean(jb), mean(kb)])
+    # Calculate the mean magnetic field and unit vector
+    B0 = [mean(ib), mean(jb), mean(kb)]
+    Bhat = normalize(B0)
 
     for k in 1:nz, j in 1:ny, i in 1:nx
         
@@ -310,47 +319,49 @@ function decomposition_S(
         kx = i - div(nx, 2) - 1
         ky = j - div(ny, 2) - 1
         kz = k - div(nz, 2) - 1
-        khat = normalize([kx, ky, kz])
+        kk = [kx, ky, kz]
+        khat = normalize(kk)
 
         # Avoid zero wave vectors
-        if sum(khat .^ 2.0) > 0
-            # Calculate the dot product of khat and Bhat
-            kdotB = dot(khat, Bhat)
+        if sum(kk .^ 2.0) > 0
+            # Calculate the dot product of khat and Bhat (cosθ)
+            cosθ = dot(khat, Bhat)
 
             # Fast mode wave speed
-            Δ2 = (ms_factor)^2 - (4 * v_A^2 * c_s^2 * kdotB^2)
+            Δ2 = (ms_factor)^2 - (4 * v_A^2 * c_s^2 * cosθ^2)
             c_wave = sqrt(0.5 * (ms_factor - sqrt(Δ2)))
 
             # Induction equation denominator
-            ind_denom = c_wave * v_A * sqrt(ρ_0)
+            # ind_denom = c_wave * v_A * sqrt(ρ0)
             
-            D = (1 + α)^2 - (4 * α * kdotB^2)
-            prefactor_para = 1 + sqrt(D) - α
-            prefactor_perp = 1 - sqrt(D) + α
+            D = (1 + α)^2 - (4 * α * cosθ^2)
+            prefactor_para = - 1 + α - sqrt(D)
+            prefactor_perp = 1 + α - sqrt(D)
 
-            if 1.0 - abs(kdotB) > epsilon
+            # Remove k_perp = 0 case
+            if 1.0 - abs(cosθ) > epsilon
 				#= 
-                Get the slow mode Fourier vector
-                ζ_fast \propto (- 1 - sqrt(D) + alpha) * k_para + 
-                    (1 - sqrt(D) + alpha) * k_perp
+                Get the slow mode basis vector
+                ζ_fast ∝ (- 1 + α - sqrt(D)) * k_para + 
+                    (1 + α - sqrt(D)) * k_perp
                 =#
-                k_para = dot(khat, Bhat) .* Bhat
-                k_perp = khat .- k_para
-                ζ_mode = normalize((-prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
+                k_para = dot(kk, Bhat) .* Bhat
+                k_perp = kk .- k_para
+                ζ_mode = normalize((prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
 
                 # Get projected Fourier velocity vector
                 v_fft_out = dot(v_fft, ζ_mode) .* ζ_mode
 
-                # Assign the decomposed velocity components
-                vv_fft_out[i,j,k,:] = v_fft_out
-                
                 if abs(c_wave) > 0
                     # Get B-field Fourier components
-                    b_fft_out = cross(khat, cross(v_fft_out, Bhat)) ./ ind_denom
+                    b_fft_out = cross(khat, cross(v_fft_out, B0)) ./ c_wave
                 else
                     # Remove non-propagating modes
-                    b_fft_out = [0, 0, 0]
+                    b_fft_out = [0., 0., 0.]
                 end
+                
+                # Assign the decomposed velocity components
+                vv_fft_out[i,j,k,:] = v_fft_out
                 
                 # Assign the decomposed magnetic field components
                 bb_fft_out[i,j,k,:] = b_fft_out
