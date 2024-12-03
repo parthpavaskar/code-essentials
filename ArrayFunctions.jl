@@ -13,6 +13,7 @@ using BaseIO
 
 #***********************************************************************
 
+export meshgrid_2D, meshgrid_3D
 export sub_grid, sub_blocks, select_grid, cstd
 export outer_product, identity_matrix, vector_triple_product
 export vector_rotation, scalar_rotation
@@ -20,6 +21,21 @@ export add_periodic_ghost_cells
 
 #***********************************************************************
 
+
+function meshgrid_2D(v1::Vect, v2::Vect)::Tuple{Matx, Matx}
+    x, y = length(v1), length(v2)
+    vg1 = reshape(v1, x, 1) .* ones(x, y)
+    vg2 = reshape(v2, 1, y) .* ones(x, y)
+    return vg1, vg2
+end
+
+function meshgrid_3D(v1::Vect, v2::Vect, v3::Vect)::Tuple{Cube, Cube, Cube}
+    x, y, z = length(v1), length(v2), length(v3)
+    vg1 = reshape(v1, x, 1, 1) .* ones(x, y, z)
+    vg2 = reshape(v2, 1, y, 1) .* ones(x, y, z)
+    vg3 = reshape(v3, 1, 1, z) .* ones(x, y, z)
+    return vg1, vg2, vg3
+end
 
 function sub_grid(arr::Matx, res::Int; center::Bool=true, grid_i::Int=1, grid_j::Int=1)::Matx
     nres = Int(size(arr)[1] / 2)
