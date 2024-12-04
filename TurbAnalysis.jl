@@ -17,8 +17,7 @@ using DecompMHD
 #***********************************************************************
 
 export oned_energy_spectrum, oned_energy_spectrum_para, oned_energy_spectrum_perp
-export PCASF_decomposition
-export decomp_simple_A, decomp_simple_C, decomp_simple_F, decomp_simple_S
+export fourier_filter_2D, fourier_filter_3D
 export get_ma_dv, get_ma_db, get_ma2d_dv, get_ma2d_db, get_ms, entot, entot_weighted
 export get_enfrac_ac, get_enfrac_asf, get_enfrac_asf_total, enfrac_vs_time
 export sf2d
@@ -35,21 +34,17 @@ function oned_energy_spectrum(u::Cube)::Vect
     
     # Average over spherical shells
     nx, ny, nz = size(u)
-    kx = [i-(nx/2) for i in 0:nx-1]
-    ky = [j-(ny/2) for j in 0:ny-1]
-    kz = [k-(nz/2) for k in 0:nz-1]
-
-    ksq = [kx[i]^2 + ky[j]^2 + kz[k]^2 for i in 1:nx, j in 1:ny, k in 1:nz]
-    kmax = maximum(ksq)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kz = collect(0:nz-1) .- (nz / 2)
+    kx_g, ky_g, kz_g = meshgrid_3D(kx, ky, kz)
+    
+    ksq = kx_g.^2 .+ ky_g.^2 .+ kz_g.^2
     kbins = round.(Int, sqrt.(ksq))
 
-    maxbin = maximum(kbins)
-    Pk = zeros(maxbin + 1)
+    Pk = zeros(maximum(kbins) + 1)
+    [Pk[kbins[i,j,k] + 1] += power_spectrum[i,j,k] for k in 1:nz, j in 1:ny, i in 1:nx]
 
-    for k in 1:nz, j in 1:ny, i in 1:nx
-        bin = kbins[i, j, k]
-        Pk[bin + 1] += power_spectrum[i, j, k]
-    end
     return Pk
 end
 
@@ -65,21 +60,16 @@ function oned_energy_spectrum(u::Cube, v::Cube)
     
     # Average over spherical shells
     nx, ny, nz = size(u)
-    kx = [i-(nx/2) for i in 0:nx-1]
-    ky = [j-(ny/2) for j in 0:ny-1]
-    kz = [k-(nz/2) for k in 0:nz-1]
-
-    ksq = [kx[i]^2 + ky[j]^2 + kz[k]^2 for i in 1:nx, j in 1:ny, k in 1:nz]
-    kmax = maximum(ksq)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kz = collect(0:nz-1) .- (nz / 2)
+    kx_g, ky_g, kz_g = meshgrid_3D(kx, ky, kz)
+    
+    ksq = kx_g.^2 .+ ky_g.^2 .+ kz_g.^2
     kbins = round.(Int, sqrt.(ksq))
 
-    maxbin = maximum(kbins)
-    Pk = zeros(maxbin + 1)
-
-    for k in 1:nz, j in 1:ny, i in 1:nx
-        bin = kbins[i, j, k]
-        Pk[bin + 1] += power_spectrum[i, j, k]
-    end
+    Pk = zeros(maximum(kbins) + 1)
+    [Pk[kbins[i,j,k] + 1] += power_spectrum[i,j,k] for k in 1:nz, j in 1:ny, i in 1:nx]
 
     return Pk
 end
@@ -96,21 +86,17 @@ function oned_energy_spectrum(u::Cube, v::Cube, w::Cube)::Vect
     
     # Average over spherical shells
     nx, ny, nz = size(u)
-    kx = [i-(nx/2) for i in 0:nx-1]
-    ky = [j-(ny/2) for j in 0:ny-1]
-    kz = [k-(nz/2) for k in 0:nz-1]
-
-    ksq = [kx[i]^2 + ky[j]^2 + kz[k]^2 for i in 1:nx, j in 1:ny, k in 1:nz]
-    kmax = maximum(ksq)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kz = collect(0:nz-1) .- (nz / 2)
+    kx_g, ky_g, kz_g = meshgrid_3D(kx, ky, kz)
+    
+    ksq = kx_g.^2 .+ ky_g.^2 .+ kz_g.^2
     kbins = round.(Int, sqrt.(ksq))
 
-    maxbin = maximum(kbins)
-    Pk = zeros(maxbin + 1)
-
-    for k in 1:nz, j in 1:ny, i in 1:nx
-        bin = kbins[i, j, k]
-        Pk[bin + 1] += power_spectrum[i, j, k]
-    end
+    Pk = zeros(maximum(kbins) + 1)
+    [Pk[kbins[i,j,k] + 1] += power_spectrum[i,j,k] for k in 1:nz, j in 1:ny, i in 1:nx]
+    
     return Pk
 end
 
@@ -124,23 +110,18 @@ function oned_energy_spectrum_para(u::Cube, v::Cube, w::Cube)::Vect
 
     # Compute the power spectrum
     power_spectrum = fftshift(abs2.(u_fft) + abs2.(v_fft) + abs2.(w_fft))
+    power_spectrum_sum = sum(power_spectrum, dims=(1, 2))
     
     # Average over spherical shells
     nx, ny, nz = size(u)
-    kz = [k-(nz/2) for k in 0:nz-1]
+    kz = collect(0:nz-1) .- (nz / 2)
 
-    ksq = [kz[k]^2 for k in 1:nz]
-    kmax = maximum(ksq)
+    ksq = kz.^2
     kbins = round.(Int, sqrt.(ksq))
 
-    maxbin = maximum(kbins)
-    Pk = zeros(maxbin + 1)
+    Pk = zeros(maximum(kbins) + 1)
+    [Pk[kbins[k] + 1] += power_spectrum_sum[k] for k in 1:nz]
 
-    power_spectrum_sum = sum(power_spectrum, dims=(1, 2))
-    for k in 1:nz
-        bin = kbins[k]
-        Pk[bin + 1] += power_spectrum_sum[k]
-    end
     return Pk
 end
 
@@ -155,25 +136,94 @@ function oned_energy_spectrum_perp(u::Cube, v::Cube, w::Cube)::Vect
 
     # Compute the power spectrum
     power_spectrum = fftshift(abs2.(u_fft) + abs2.(v_fft) + abs2.(w_fft))
+    power_spectrum_sum = sum(power_spectrum, dims=3)
     
     # Average over spherical shells
     nx, ny, nz = size(u)
-    kx = [i-(nx/2) for i in 0:nx-1]
-    ky = [j-(ny/2) for j in 0:ny-1]
-
-    ksq = [kx[i]^2 + ky[j]^2 for i in 1:nx, j in 1:ny]
-    kmax = maximum(ksq)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kx_g, ky_g = meshgrid_2D(kx, ky)
+    
+    ksq = kx_g.^2 .+ ky_g.^2
     kbins = round.(Int, sqrt.(ksq))
 
-    maxbin = maximum(kbins)
-    Pk = zeros(maxbin + 1)
+    Pk = zeros(maximum(kbins) + 1)
+    [Pk[kbins[i,j] + 1] += power_spectrum_sum[i,j] for j in 1:ny, i in 1:nx]
 
-    power_spectrum_sum = sum(power_spectrum, dims=3)
-    for j in 1:ny, i in 1:nx
-        bin = kbins[i, j]
-        Pk[bin + 1] += power_spectrum_sum[i, j]
-    end
     return Pk
+end
+
+function fourier_filter_2D(cdata::Matx, k_cutoff::Float64; pass::String="high", keep_mean::Bool=false)::Matx
+
+    # Get the dimensions of the matrix
+    nx, ny = size(cdata)
+
+    # Compute the Fourier transform of the matrix
+    cdata_ft = fftshift(fft(cdata))
+
+    # Initialize centered wavevector grid
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    
+    # Create a 3D grid of wavevector magnitudes
+    kx_g, ky_g, = meshgrid_2D(kx, ky)
+    kbins = sqrt.(kx_g.^2 .+ ky_g.^2)
+
+    # Create the filter mask
+    if pass == "high"
+        filter_mask = kbins .>= k_cutoff
+        # Keep mean component (k = 0) if requested
+        if keep_mean filter_mask[kbins .== 0] .= true end
+    elseif pass == "low"
+        filter_mask = kbins .<= k_cutoff
+    else
+        error("Invalid filter pass type. Choose 'high' or 'low'")
+    end
+    
+    # Apply to the Fourier data
+    cdata_ft_filtered = cdata_ft .* filter_mask
+
+    # Inverse Fourier transform
+    cdata_filtered = real(ifft(ifftshift(cdata_ft_filtered)))
+
+    return cdata_filtered
+end
+
+function fourier_filter_3D(cdata::Cube, k_cutoff::Float64; pass::String="high", keep_mean::Bool=false)::Cube
+
+    # Get the dimensions of the cube
+    nx, ny, nz = size(cdata)
+
+    # Compute the Fourier transform of the cube
+    cdata_ft = fftshift(fft(cdata))
+
+    # Initialize centered wavevector grid
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kz = collect(0:nz-1) .- (nz / 2)
+    
+    # Create a 3D grid of wavevector magnitudes
+    kx_g, ky_g, kz_g = meshgrid_3D(kx, ky, kz)
+    kbins = sqrt.(kx_g.^2 .+ ky_g.^2 .+ kz_g.^2)
+
+    # Create the filter mask
+    if pass == "high"
+        filter_mask = kbins .>= k_cutoff
+        # Keep mean component (k = 0) if requested
+        if keep_mean filter_mask[kbins .== 0] .= true end
+    elseif pass == "low"
+        filter_mask = kbins .<= k_cutoff
+    else
+        error("Invalid filter pass type. Choose 'high' or 'low'")
+    end
+    
+    # Apply to the Fourier data
+    cdata_ft_filtered = cdata_ft .* filter_mask
+
+    # Inverse Fourier transform
+    cdata_filtered = real(ifft(ifftshift(cdata_ft_filtered)))
+
+    return cdata_filtered
 end
 
 
@@ -261,9 +311,9 @@ function get_enfrac_asf_total(bx_A::Cube, by_A::Cube, bz_A::Cube, bx_F::Cube, by
     perb_bF = 100 * ( entot(bx_F, by_F, bz_F) / en_tot )
     perb_bS = 100 * ( entot(bx_S, by_S, bz_S) / en_tot )
    
-    perb_vA = 100 * ( entot(vx_A, vy_A, vz_A) / en_tot )  
-    perb_vF = 100 * ( entot(vx_F, vy_F, vz_F) / en_tot )  
-    perb_vS = 100 * ( entot(vx_S, vy_S, vz_S) / en_tot )
+    perb_vA = 100 * ( entot(vx_A, vy_A, vz_A) / en_tot )  
+    perb_vF = 100 * ( entot(vx_F, vy_F, vz_F) / en_tot )  
+    perb_vS = 100 * ( entot(vx_S, vy_S, vz_S) / en_tot )
     
     return perb_bA, perb_bF, perb_bS, perb_vA, perb_vF, perb_vS
 end
@@ -271,7 +321,7 @@ end
 function enfrac_vs_time(data_vec::Vector{String}, nres::Integer, v_A=1.0::Float64, c_s=1.0::Float64; resize_factor=4::Integer)::Array{Float64,3}
     
     n_resize = div(nres, resize_factor)
-    me_ke_AFS = init_array(Float64, length(data_vec), 2, 3)
+    me_ke_AFS = zeros(Float64, length(data_vec), 2, 3)
 
     println("Initiated \n")
     flush(stdout)
@@ -293,9 +343,12 @@ function enfrac_vs_time(data_vec::Vector{String}, nres::Integer, v_A=1.0::Float6
         vy = imresize(vy_in, (n_resize, n_resize, n_resize))
         vz = imresize(vz_in, (n_resize, n_resize, n_resize))
 
-        vx_A, vy_A, vz_A, bx_A, by_A, bz_A = decomposition_A(vx, vy, vz, bx, by, bz, v_A, c_s, ρ_0=rho_0)
-        vx_F, vy_F, vz_F, bx_F, by_F, bz_F = decomposition_F(vx, vy, vz, bx, by, bz, v_A, c_s, ρ_0=rho_0)
-        vx_S, vy_S, vz_S, bx_S, by_S, bz_S = decomposition_S(vx, vy, vz, bx, by, bz, v_A, c_s, ρ_0=rho_0)
+        filter_large_scale_field(bx, by, bz, 1.0)
+        B0 = [mean(bx), mean(by), mean(bz)]
+
+        vx_A, vy_A, vz_A, bx_A, by_A, bz_A = decomposition_A(vx, vy, vz, B0, v_A, c_s, ρ0=rho_0)
+        vx_F, vy_F, vz_F, bx_F, by_F, bz_F = decomposition_F(vx, vy, vz, B0, v_A, c_s, ρ0=rho_0)
+        vx_S, vy_S, vz_S, bx_S, by_S, bz_S = decomposition_S(vx, vy, vz, B0, v_A, c_s, ρ0=rho_0)
 
         me_ke_AFS[it,1,1] = entot(bx_A, by_A, bz_A)
         me_ke_AFS[it,1,2] = entot(bx_F, by_F, bz_F)
