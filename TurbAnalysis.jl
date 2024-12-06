@@ -318,7 +318,7 @@ function get_enfrac_asf_total(bx_A::Cube, by_A::Cube, bz_A::Cube, bx_F::Cube, by
     return perb_bA, perb_bF, perb_bS, perb_vA, perb_vF, perb_vS
 end
 
-function enfrac_vs_time(data_vec::Vector{String}, nres::Integer, v_A=1.0::Float64, c_s=1.0::Float64; resize_factor=4::Integer)::Array{Float64,3}
+function enfrac_vs_time(data_vec::Vector{String}, nres::Integer, βin=1.0::Float64; resize_factor=4::Integer)::Array{Float64,3}
     
     n_resize = div(nres, resize_factor)
     me_ke_AFS = zeros(Float64, length(data_vec), 2, 3)
@@ -343,12 +343,11 @@ function enfrac_vs_time(data_vec::Vector{String}, nres::Integer, v_A=1.0::Float6
         vy = imresize(vy_in, (n_resize, n_resize, n_resize))
         vz = imresize(vz_in, (n_resize, n_resize, n_resize))
 
-        filter_large_scale_field(bx, by, bz, 1.0)
         B0 = [mean(bx), mean(by), mean(bz)]
 
-        vx_A, vy_A, vz_A, bx_A, by_A, bz_A = decomposition_A(vx, vy, vz, B0, v_A, c_s, ρ0=rho_0)
-        vx_F, vy_F, vz_F, bx_F, by_F, bz_F = decomposition_F(vx, vy, vz, B0, v_A, c_s, ρ0=rho_0)
-        vx_S, vy_S, vz_S, bx_S, by_S, bz_S = decomposition_S(vx, vy, vz, B0, v_A, c_s, ρ0=rho_0)
+        vx_A, vy_A, vz_A, bx_A, by_A, bz_A = decomposition_A(vx, vy, vz, B0, βin, ρ0=rho_0)
+        vx_F, vy_F, vz_F, bx_F, by_F, bz_F = decomposition_F(vx, vy, vz, B0, βin, ρ0=rho_0)
+        vx_S, vy_S, vz_S, bx_S, by_S, bz_S = decomposition_S(vx, vy, vz, B0, βin, ρ0=rho_0)
 
         me_ke_AFS[it,1,1] = entot(bx_A, by_A, bz_A)
         me_ke_AFS[it,1,2] = entot(bx_F, by_F, bz_F)
