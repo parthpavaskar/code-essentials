@@ -2,7 +2,7 @@
 module DataStruct
 #***********************************************************************
 
-export Vect, Matx, Cube
+export Vect, Matx, Cube, CmVect, CmMatx, CmCube
 export init_array, decompression_mode
 
 #***********************************************************************
@@ -10,6 +10,10 @@ export init_array, decompression_mode
 const Vect{T}  = Array{T,1}
 const Matx{T}  = Array{T,2}
 const Cube{T}  = Array{T,3}
+
+const CmVect{T}  = Array{Complex{T},1}
+const CmMatx{T}  = Array{Complex{T},2}
+const CmCube{T}  = Array{Complex{T},3}
 
 function init_array(::Type{T}, dims::Integer...) where T
     return Array{T}(undef, dims)
