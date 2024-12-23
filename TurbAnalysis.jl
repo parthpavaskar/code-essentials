@@ -318,7 +318,7 @@ function get_enfrac_asf_total(bx_A::Cube, by_A::Cube, bz_A::Cube, bx_F::Cube, by
     return perb_bA, perb_bF, perb_bS, perb_vA, perb_vF, perb_vS
 end
 
-function enfrac_vs_time(data_vec::Vector{String}, nres::Integer, βin=1.0::Float64; resize_factor=4::Integer)::Array{Float64,3}
+function enfrac_vs_time(data_vec::Vector{String}, nres::Integer; resize_factor=4::Integer, βin=1.0::Float64)::Array{Float64,3}
     
     n_resize = div(nres, resize_factor)
     me_ke_AFS = zeros(Float64, length(data_vec), 2, 3)

@@ -15,6 +15,7 @@ using ArrayFunctions
 #***********************************************************************
 
 export decomposition_A, decomposition_F, decomposition_S
+export decomposition_A_m2, decomposition_F_m2, decomposition_S_m2
 
 #***********************************************************************
 
@@ -63,8 +64,8 @@ function decomposition_A(
     kv_fft = fftshift(fft(kv))
 
     # Initialize the Fourier output arrays
-    vv_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
-    bb_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
+    vv_fft_out = zeros(ComplexF64, size(iv_fft)..., 3)
+    bb_fft_out = zeros(ComplexF64, size(iv_fft)..., 3)
 
     for k in 1:nz, j in 1:ny, i in 1:nx
 
@@ -79,7 +80,7 @@ function decomposition_A(
         khat = normalize(kk)
 
         # Avoid zero wave vectors
-        if sum(kk .^ 2.0) > 0
+        if !iszero(norm(kk))
             # Calculate the dot product of khat and Bhat (cosθ)
             cosθ = dot(khat, Bhat)
 
@@ -93,12 +94,12 @@ function decomposition_A(
             if 1.0 - abs(cosθ) > ε
 				#= 
                 Get the Alfven mode basis vector
-                ζ_Alf = k x B
+                ξ_Alf = k x B
                 =#
-                ζ_mode = normalize(cross(khat, Bhat))
+                ξ_mode = normalize(cross(khat, Bhat))
 
                 # Get projected Fourier velocity vector
-                v_fft_out = dot(v_fft, ζ_mode) .* ζ_mode
+                v_fft_out = dot(v_fft, ξ_mode) .* ξ_mode
 
                 if abs(c_wave) > 0
                     # Get B-field Fourier components
@@ -175,8 +176,8 @@ function decomposition_F(
     kv_fft = fftshift(fft(kv))
 
     # Initialize the Fourier output arrays
-    vv_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
-    bb_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
+    vv_fft_out = zeros(ComplexF64, size(iv_fft)..., 3)
+    bb_fft_out = zeros(ComplexF64, size(iv_fft)..., 3)
 
     for k in 1:nz, j in 1:ny, i in 1:nx
         
@@ -191,34 +192,34 @@ function decomposition_F(
         khat = normalize(kk)
 
         # Avoid zero wave vectors
-        if sum(kk .^ 2.0) > 0
+        if !iszero(norm(kk))
             # Calculate the dot product of khat and Bhat (cosθ)
             cosθ = dot(khat, Bhat)
-
-            # Fast mode wave speed
-            Δ2 = (1.0 + α)^2 - (4.0 * α * cosθ^2)
-            c_wave = v_A * sqrt(0.5 * ((1.0 + α) + sqrt(Δ2)))
 
             # Induction equation denominator
             # ind_denom = c_wave * v_A * sqrt(ρ0)
             
+            # Factors from CL03
             D = (1.0 + α)^2 - (4.0 * α * cosθ^2)
             prefactor_para = - 1.0 + α + sqrt(D)
             prefactor_perp = 1.0 + α + sqrt(D)
+
+            # Fast mode wave speed
+            c_wave = v_A * sqrt(0.5 * prefactor_perp)
 
             # Remove k_perp = 0 case    
             if 1.0 - abs(cosθ) > ε
 				#= 
                 Get the fast mode basis vector
-                ζ_fast ∝ (- 1 + α + sqrt(D)) * k_para + 
+                ξ_fast ∝ (- 1 + α + sqrt(D)) * k_para + 
                     (1 + α + sqrt(D)) * k_perp
                 =#
                 k_para = dot(kk, Bhat) .* Bhat
                 k_perp = kk .- k_para
-                ζ_mode = normalize((prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
+                ξ_mode = normalize((prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
 
                 # Get projected Fourier velocity vector
-                v_fft_out = dot(v_fft, ζ_mode) .* ζ_mode
+                v_fft_out = dot(v_fft, ξ_mode) .* ξ_mode
 
                 if abs(c_wave) > 0
                     # Get B-field Fourier components
@@ -295,8 +296,8 @@ function decomposition_S(
     kv_fft = fftshift(fft(kv))
 
     # Initialize the Fourier output arrays
-    vv_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
-    bb_fft_out = zeros(typeof(1.0 + im), size(iv_fft)..., 3)
+    vv_fft_out = zeros(ComplexF64, size(iv_fft)..., 3)
+    bb_fft_out = zeros(ComplexF64, size(iv_fft)..., 3)
 
     for k in 1:nz, j in 1:ny, i in 1:nx
         
@@ -311,34 +312,34 @@ function decomposition_S(
         khat = normalize(kk)
 
         # Avoid zero wave vectors
-        if sum(kk .^ 2.0) > 0
+        if !iszero(norm(kk))
             # Calculate the dot product of khat and Bhat (cosθ)
             cosθ = dot(khat, Bhat)
-
-            # Slow mode wave speed
-            Δ2 = (1.0 + α)^2 - (4.0 * α * cosθ^2)
-            c_wave = v_A * sqrt(0.5 * ((1.0 + α) - sqrt(Δ2)))
 
             # Induction equation denominator
             # ind_denom = c_wave * v_A * sqrt(ρ0)
             
-            D = (1 + α)^2 - (4 * α * cosθ^2)
-            prefactor_para = - 1 + α - sqrt(D)
-            prefactor_perp = 1 + α - sqrt(D)
+            # Factors from CL03
+            D = (1.0 + α)^2 - (4.0 * α * cosθ^2)
+            prefactor_para = - 1.0 + α - sqrt(D)
+            prefactor_perp = 1.0 + α - sqrt(D)
+
+            # Slow mode wave speed
+            c_wave = v_A * sqrt(0.5 * prefactor_perp)
 
             # Remove k_perp = 0 case
             if 1.0 - abs(cosθ) > ε
 				#= 
                 Get the slow mode basis vector
-                ζ_fast ∝ (- 1 + α - sqrt(D)) * k_para + 
+                ξ_fast ∝ (- 1 + α - sqrt(D)) * k_para + 
                     (1 + α - sqrt(D)) * k_perp
                 =#
                 k_para = dot(kk, Bhat) .* Bhat
                 k_perp = kk .- k_para
-                ζ_mode = normalize((prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
+                ξ_mode = normalize((prefactor_para .* k_para) .+ (prefactor_perp .* k_perp))
 
                 # Get projected Fourier velocity vector
-                v_fft_out = dot(v_fft, ζ_mode) .* ζ_mode
+                v_fft_out = dot(v_fft, ξ_mode) .* ξ_mode
 
                 if abs(c_wave) > 0
                     # Get B-field Fourier components
@@ -370,5 +371,4 @@ function decomposition_S(
     return iv_out, jv_out, kv_out, ib_out, jb_out, kb_out
 end
 
-
-end #top
+end # module
