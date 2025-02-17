@@ -17,7 +17,7 @@ using DecompMHD
 #***********************************************************************
 
 export oned_energy_spectrum, oned_energy_spectrum_para, oned_energy_spectrum_perp
-export fourier_filter_2D, fourier_filter_3D
+export twod_energy_spectrum, fourier_filter_2D, fourier_filter_3D
 export get_ma_dv, get_ma_db, get_ma2d_dv, get_ma2d_db, get_ms, entot, entot_weighted
 export get_enfrac_ac, get_enfrac_asf, get_enfrac_asf_total, enfrac_vs_time
 export sf2d
@@ -152,6 +152,33 @@ function oned_energy_spectrum_perp(u::Cube, v::Cube, w::Cube)::Vect
 
     return Pk
 end
+
+function twod_energy_spectrum(u::Cube, v::Cube, w::Cube)::Matx
+    
+    # Perform FFT on each component of the field
+    u_fft = fft(u)
+    v_fft = fft(v)
+    w_fft = fft(w)
+
+    # Compute the power spectrum
+    power_spectrum = fftshift(abs2.(u_fft) + abs2.(v_fft) + abs2.(w_fft))
+    power_spectrum_sum = sum(power_spectrum, dims=3)
+    
+    # Average over spherical shells
+    nx, ny, nz = size(u)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kx_g, ky_g = meshgrid_2D(kx, ky)
+    
+    ksq = kx_g.^2 .+ ky_g.^2
+    kbins = round.(Int, sqrt.(ksq))
+
+    Pk = zeros(nz, maximum(kbins) + 1)
+    [Pk[k, kbins[i,j] + 1] += power_spectrum[i,j,k] for k in 1:nz, j in 1:ny, i in 1:nx]
+
+    return log.(Pk[div(nz,2)+2:end, 2:div(nx,2)])
+end
+
 
 function fourier_filter_2D(cdata::Matx, k_cutoff::Float64; pass::String="high", keep_mean::Bool=false)::Matx
 
