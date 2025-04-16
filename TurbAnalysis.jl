@@ -16,6 +16,7 @@ using DecompMHD
 
 #***********************************************************************
 
+export energy_spectrum_all
 export oned_energy_spectrum, oned_energy_spectrum_para, oned_energy_spectrum_perp
 export twod_energy_spectrum, fourier_filter_2D, fourier_filter_3D
 export get_ma_dv, get_ma_db, get_ma2d_dv, get_ma2d_db, get_ms, entot, entot_weighted
@@ -23,6 +24,55 @@ export get_enfrac_ac, get_enfrac_asf, get_enfrac_asf_total, enfrac_vs_time
 export sf2d
 
 #***********************************************************************
+
+function energy_spectrum_all(u::Cube, v::Cube, w::Cube)::Tuple{Vect, Vect, Vect, Matx}
+    
+    # Perform FFT on each component of the field
+    u_fft = fft(u)
+    v_fft = fft(v)
+    w_fft = fft(w)
+
+    # Compute the power spectrum
+    power_spectrum = fftshift(abs2.(u_fft) + abs2.(v_fft) + abs2.(w_fft))
+    power_spectrum_sum_para = sum(power_spectrum, dims=(1, 2))
+    power_spectrum_sum_perp = sum(power_spectrum, dims=3)
+    
+    # Average over spherical shells
+    nx, ny, nz = size(u)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kz = collect(0:nz-1) .- (nz / 2)
+    kx_g, ky_g, kz_g = meshgrid_3D(kx, ky, kz)
+    kx_g2, ky_g2 = meshgrid_2D(kx, ky)
+    
+    # 1D spectrum
+    ksq = kx_g.^2 .+ ky_g.^2 .+ kz_g.^2
+    kbins1d = round.(Int, sqrt.(ksq))
+    Pk1d = zeros(maximum(kbins1d) + 1)
+
+    # 2D spectrum
+    ksq = kx_g2.^2 .+ ky_g2.^2
+    kbins2d = round.(Int, sqrt.(ksq))
+    Pk2d = zeros(nz, maximum(kbins2d) + 1)
+
+    # 1D parallel spectrum
+    ksq = kz.^2
+    kbinspar = round.(Int, sqrt.(ksq))
+    Pk1d_para = zeros(maximum(kbinspar) + 1)
+    
+    for k in 1:nz
+        Pk1d_para[kbinspar[k] + 1] += power_spectrum_sum_para[k]
+        for j in 1:ny, i in 1:nx 
+        Pk1d[kbins1d[i,j,k] + 1] += power_spectrum[i,j,k]
+        Pk2d[k, kbins2d[i,j] + 1] += power_spectrum[i,j,k]
+        end
+    end 
+
+    Pk1d_perp = sum(Pk2d, dims=1)[1,:]
+
+    return Pk1d, Pk1d_para, Pk1d_perp, Pk2d[div(nz,2)+2:end, 2:div(nx,2)]
+end
+
 
 function oned_energy_spectrum(u::Cube)::Vect
     
@@ -162,7 +212,6 @@ function twod_energy_spectrum(u::Cube, v::Cube, w::Cube)::Matx
 
     # Compute the power spectrum
     power_spectrum = fftshift(abs2.(u_fft) + abs2.(v_fft) + abs2.(w_fft))
-    power_spectrum_sum = sum(power_spectrum, dims=3)
     
     # Average over spherical shells
     nx, ny, nz = size(u)
@@ -176,7 +225,7 @@ function twod_energy_spectrum(u::Cube, v::Cube, w::Cube)::Matx
     Pk = zeros(nz, maximum(kbins) + 1)
     [Pk[k, kbins[i,j] + 1] += power_spectrum[i,j,k] for k in 1:nz, j in 1:ny, i in 1:nx]
 
-    return log.(Pk[div(nz,2)+2:end, 2:div(nx,2)])
+    return Pk[div(nz,2)+2:end, 2:div(nx,2)]
 end
 
 

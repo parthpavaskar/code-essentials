@@ -17,7 +17,8 @@ using DataStruct
 
 export hread, read_data_unified, read_pencil_hdf
 export rs_kij, read_gsa, convert_athdf, read_data_athdf
-export read_data_athdf_bonly, read_data_athdf_dvonly
+export read_data_athdf_bonly, read_data_athdf_vonly
+export read_data_athdf_donly, read_data_athdf_dvonly
 
 #***********************************************************************
 
@@ -78,6 +79,33 @@ function read_data_athdf(db, nsize)
     close(f)
     
     return d,iv,jv,kv,ib,jb,kb
+end
+
+
+function read_data_athdf_vonly(db, nsize)
+    
+    f = h5open(db,"r")
+    prim = read(f,"prim")
+    LL   = read(f,"LogicalLocations")
+    
+    iv=puzzleX(prim,LL,2,nsize,nsize,nsize)
+    jv=puzzleX(prim,LL,3,nsize,nsize,nsize)
+    kv=puzzleX(prim,LL,4,nsize,nsize,nsize)
+    close(f)
+    
+    return iv,jv,kv
+end
+
+function read_data_athdf_donly(db, nsize)
+    
+    f = h5open(db,"r")
+    prim = read(f,"prim")
+    LL   = read(f,"LogicalLocations")
+    
+    d =puzzleX(prim,LL,1,nsize,nsize,nsize)
+    close(f)
+    
+    return d
 end
 
 

@@ -1,12 +1,12 @@
 #***********************************************************************
-module SpaFunctions
+module SPAFunctions
 #***********************************************************************
 
 # MATH PACKAGES
 using Statistics
 using FFTW, Random
 using LinearAlgebra
-using Images
+using Images, LsqFit
 
 # CUSTOM PACKAGES
 using DataStruct
@@ -21,8 +21,7 @@ export get_stokes, get_stokes_w09, get_stokes_fr_emitting_layer
 export get_stokes_fr_emitting_layer_sm, get_stokes_fr_foreground_random
 export get_sxx, sxx_spap_fit, sxx_full_fit, get_spap_fit, get_full_fit
 export get_ξxx, get_yxx, linearize_sxx, s_fluct_array, spa_zhang
-export spa_zhang
-
+export spa_plus, spa_plus_obs
 #***********************************************************************
 
 """
@@ -125,11 +124,11 @@ function get_stokes_fr_foreground_random(bi::Cube, bj::Cube, fr_std::Integer)::T
 end
 
 
-function get_sxx(I::Matx, Q::Matx, U::Matx)::Tuple{Vect, Vect, Float64}
+function get_sxx(I::Matx, Q::Matx, U::Matx)::Tuple{Vect, Vect}
     ϕ_arr = zeros(0)
     sxx_iqd2 = zeros(0)
     ϕ_obs = 0.5 .* atan.(U,Q)
-    ϕ_obs_mean = mean(ϕ_in)
+    ϕ_obs_mean = mean(ϕ_obs)
     for ϕ_s in deg2rad.(0:1:180)
         push!(ϕ_arr, ϕ_obs_mean + ϕ_s)
         Q_rot = Q .* cos(2.0 * ϕ_s) - U .* sin(2.0 * ϕ_s)
@@ -171,8 +170,7 @@ end
 function spa_plus(nres::Integer, params::SpaPlusParams; 
     lower_lim::Integer=20, upper_lim::Integer=80, diff::Integer=10,
     sub_center::Bool=true, sub_i::Integer=1, sub_j::Integer=1,
-    k_inj::Integer=2, gam88::Bool=false)
-    ::Tuple{Array{Float64,3}, Array{Float64,3}, Array{Float64,3}}
+    k_inj::Integer=2, gam88::Bool=false)::Tuple{Array{Float64,3}, Array{Float64,3}, Array{Float64,3}}
 
     gamma_r = collect(lower_lim:diff:upper_lim)
     
@@ -220,6 +218,25 @@ function spa_plus(nres::Integer, params::SpaPlusParams;
         flush(stdout)
     end
     return phi_s, sxx_fn, fpar_fn
+end
+
+function spa_plus_obs(ii_map::Matx, qq_map::Matx, uu_map::Matx, spotsize::Integer)::Cube
+    nres = size(ii_map)[1]
+
+    overlap_spot = div(spotsize, 2)
+    scan_grid = collect(1:overlap_spot:nres-spotsize)
+    phi_s = zeros(Float64, 181, length(scan_grid), length(scan_grid))
+    fpar_fn = zeros(Float64, 5, length(scan_grid), length(scan_grid))
+
+    for i in 1:length(scan_grid), j in 1:length(scan_grid)
+        ii_spt = ii_map[scan_grid[i]:scan_grid[i]+spotsize, scan_grid[j]:scan_grid[j]+spotsize]
+        qq_spt = qq_map[scan_grid[i]:scan_grid[i]+spotsize, scan_grid[j]:scan_grid[j]+spotsize]
+        uu_spt = uu_map[scan_grid[i]:scan_grid[i]+spotsize, scan_grid[j]:scan_grid[j]+spotsize]
+
+        phi_s, sxx_fn = get_sxx(ii_spt, qq_spt, uu_spt)
+        fpar_fn[:,i,j] = get_spap_fit(phi_s, sxx_fn)
+    end
+    return fpar_fn
 end
 
 
