@@ -441,85 +441,148 @@ end
 function sf2d(bx::Cube, by::Cube, bz::Cube, nres::Integer, nrandpts::Integer, n_avg_bfield_pts::Integer)
     
     nresby4 = div(nres, 4)
-    sf_2d = init_array(Float64, nresby4, nresby4)
+    sf_2d = zeros(Float64, nresby4, nresby4)
     
-    for ipar in 1:nresby4
-    
-        lpar = ipar .* 1.0 - 1
+    for (ipar, lpar) in enumerate(0:nresby4-1), (iperp,lperp) in enumerate(0:nresby4-1)
+        ssff = 0.0
+        numpt = 0
 
-        for iperp in 1:nresby4
+        for kup in 1:nrandpts
 
-            lperp = iperp * 1.0 - 1 
-            
-            ssff = 0.0
-            numpt = 0
+            ri = rand(1:nres,3)
 
-            for kup in 1:nrandpts
-
-                ri = rand(1:nres,3)
-
-                sp_rad = sqrt(lpar.^2 .+ lperp^2) / 2.0
-
-                lr = rand(n_avg_bfield_pts) .* sp_rad
-                theta = rand(n_avg_bfield_pts) .* π
-                phi   = rand(n_avg_bfield_pts) .* 2.0 .* π
-
-                lx = lr .* sin.(theta) .* cos.(phi)
-                ly = lr .* sin.(theta) .* sin.(phi)
-                lz = lr .* cos.(theta)
-
-                xis = Int.(floor.(ri[1] .+ lx))
-                yis = Int.(floor.(ri[2] .+ ly))
-                zis = Int.(floor.(ri[3] .+ lz))
-                
-                xis = 1 .+ mod.(xis, nres)
-                yis = 1 .+ mod.(yis, nres)
-                zis = 1 .+ mod.(zis, nres)
-                
-                bxs = [bx[xis[ii],yis[ii],zis[ii]] for ii in 1:n_avg_bfield_pts]
-                bys = [by[xis[ii],yis[ii],zis[ii]] for ii in 1:n_avg_bfield_pts]
-                bzs = [bz[xis[ii],yis[ii],zis[ii]] for ii in 1:n_avg_bfield_pts]
-                
-                bhat = [ mean(bxs), mean(bys), mean(bzs) ]
-                bhat = bhat / (sqrt(sum(bhat.^2)))
-
-                vrand = rand(3)
-
-                perpb_x = bhat[2] * vrand[3] - bhat[3] * vrand[2]
-                perpb_y = bhat[3] * vrand[1] - bhat[1] * vrand[3]
-                perpb_z = bhat[1] * vrand[2] - bhat[2] * vrand[1]
-
-                perpb = [ perpb_x, perpb_y, perpb_z ]
-                perpb = perpb / (sqrt(sum(perpb.^2)))
-
-                r1 = Int.(floor.(ri + (lperp / 2.0) .* perpb + (lpar / 2.0) .* bhat))
-                r2 = Int.(floor.(ri - (lperp / 2.0) .* perpb - (lpar / 2.0) .* bhat))
-
-                r1 = 1 .+ mod.(r1, nres)
-                r2 = 1 .+ mod.(r2, nres)
-
-                b1 = [ bx[r1[1],r1[2],r1[3]], by[r1[1],r1[2],r1[3]], bz[r1[1],r1[2],r1[3]] ]
-                b2 = [ bx[r2[1],r2[2],r2[3]], by[r2[1],r2[2],r2[3]], bz[r2[1],r2[2],r2[3]] ]
-
-                diff = b1 - b2
-                summb = sum(diff.^2)
-                if isinf(summb) || isnan(summb)
-                    print("isinf isnan")
-                    continue
+            sp_rad = sqrt(lpar.^2 .+ lperp^2) / 2.0
+            # Find all points inside a sphere of radius sp_rad centered at ri
+            inside_sphere_indices = []
+            for ix in max(1, ri[1]-ceil(Int, sp_rad)):min(nres, ri[1]+ceil(Int, sp_rad))
+                for iy in max(1, ri[2]-ceil(Int, sp_rad)):min(nres, ri[2]+ceil(Int, sp_rad))
+                    for iz in max(1, ri[3]-ceil(Int, sp_rad)):min(nres, ri[3]+ceil(Int, sp_rad))
+                        # Calculate distance from ri
+                        dist = sqrt((ix-ri[1])^2 + (iy-ri[2])^2 + (iz-ri[3])^2)
+                        if dist <= sp_rad
+                            push!(inside_sphere_indices, (ix, iy, iz))
+                        end
+                    end
                 end
-
-                ssff += summb
-                numpt += 1
-
             end
 
-            sf_2d[ipar, iperp] = ssff / numpt
+            # If no points found (unlikely but possible), use a single point approach
+            if isempty(inside_sphere_indices)
+                bhat = [bx[ri[1], ri[2], ri[3]], by[ri[1], ri[2], ri[3]], bz[ri[1], ri[2], ri[3]]]
+            else
+                # Calculate mean magnetic field inside the sphere
+                bx_sum, by_sum, bz_sum = 0.0, 0.0, 0.0
+                for (ix, iy, iz) in inside_sphere_indices
+                    bx_sum += bx[ix, iy, iz]
+                    by_sum += by[ix, iy, iz]
+                    bz_sum += bz[ix, iy, iz]
+                end
+                
+                n_points = length(inside_sphere_indices)
+                bhat = [bx_sum/n_points, by_sum/n_points, bz_sum/n_points]
+            end
+
+            # Normalize to get unit vector
+            bhat = bhat / (sqrt(sum(bhat.^2)))
+
+            vrand = rand(3)
+
+            perpb_x = bhat[2] * vrand[3] - bhat[3] * vrand[2]
+            perpb_y = bhat[3] * vrand[1] - bhat[1] * vrand[3]
+            perpb_z = bhat[1] * vrand[2] - bhat[2] * vrand[1]
+
+            perpb = [ perpb_x, perpb_y, perpb_z ]
+            perpb = perpb / (sqrt(sum(perpb.^2)))
+
+            r1 = Int.(floor.(ri + (lperp / 2.0) .* perpb + (lpar / 2.0) .* bhat))
+            r2 = Int.(floor.(ri - (lperp / 2.0) .* perpb - (lpar / 2.0) .* bhat))
+
+            r1 = 1 .+ mod.(r1, nres)
+            r2 = 1 .+ mod.(r2, nres)
+
+            b1 = [ bx[r1[1],r1[2],r1[3]], by[r1[1],r1[2],r1[3]], bz[r1[1],r1[2],r1[3]] ]
+            b2 = [ bx[r2[1],r2[2],r2[3]], by[r2[1],r2[2],r2[3]], bz[r2[1],r2[2],r2[3]] ]
+
+            diff = b1 - b2
+            summb = sum(diff.^2)
+            if isinf(summb) || isnan(summb)
+                print("isinf isnan")
+                continue
+            end
+
+            ssff += summb
+            numpt += 1
 
         end
+        sf_2d[ipar, iperp] = ssff / numpt
     end
     return sf_2d
 end
 
+
+function structure_function_2d(vx::Cube, vy::Cube, vz::Cube, max_separation::Int, num_samples::Int)
+    nx, ny, nz = size(vx)
+    sf = zeros(Float64, max_separation, max_separation)
+    counts = zeros(Int, max_separation, max_separation)
+    
+    # Compute mean magnetic field direction
+    bx_mean, by_mean, bz_mean = mean(vx), mean(vy), mean(vz)
+    b_direction = [bx_mean, by_mean, bz_mean]
+    b_mag = norm(b_direction)
+    
+    # Normalize to get unit vector (if non-zero)
+    if b_mag > 1e-10
+        b_direction = b_direction / b_mag
+    else
+        # Default direction if mean field is near zero
+        b_direction = [0.0, 0.0, 1.0]
+    end
+    
+    # Compute perpendicular direction
+    perp_direction = [0.0, 0.0, 0.0]
+    if abs(b_direction[3]) < 0.9
+        perp_direction = normalize([b_direction[2], -b_direction[1], 0.0])
+    else
+        perp_direction = normalize([1.0, 0.0, 0.0])
+    end
+    
+    for _ in 1:num_samples
+        # Random starting point
+        x, y, z = rand(1:nx), rand(1:ny), rand(1:nz)
+        
+        for l_par in 1:max_separation, l_perp in 1:max_separation
+            # Skip the zero displacement case
+            (l_par == 1 && l_perp == 1) && continue
+            
+            # Calculate displacement vectors
+            δpar = (l_par - 1) * b_direction
+            δperp = (l_perp - 1) * perp_direction
+            
+            # Calculate endpoint coordinates with periodic boundary conditions
+            x2 = mod1(round(Int, x + δpar[1] + δperp[1]), nx)
+            y2 = mod1(round(Int, y + δpar[2] + δperp[2]), ny)
+            z2 = mod1(round(Int, z + δpar[3] + δperp[3]), nz)
+            
+            # Calculate squared difference for vector components
+            diff_squared = (vx[x,y,z] - vx[x2,y2,z2])^2 + 
+                          (vy[x,y,z] - vy[x2,y2,z2])^2 + 
+                          (vz[x,y,z] - vz[x2,y2,z2])^2
+            
+            # Accumulate result
+            sf[l_par, l_perp] += diff_squared
+            counts[l_par, l_perp] += 1
+        end
+    end
+    
+    # Normalize by counts
+    for i in eachindex(sf)
+        if counts[i] > 0
+            sf[i] /= counts[i]
+        end
+    end
+    
+    return sf
+end
 
 
 end #top
