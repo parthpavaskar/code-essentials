@@ -21,11 +21,12 @@ export get_stokes, get_stokes_w09, get_stokes_fr_emitting_layer
 export get_stokes_fr_emitting_layer_sm, get_stokes_fr_foreground_random
 export get_sxx, sxx_spap_fit, sxx_full_fit, get_spap_fit, get_full_fit
 export get_ξxx, get_yxx, linearize_sxx, s_fluct_array, spa_zhang
-export spa_plus, spa_plus_obs
+export spa_plus, spa_plus_obs, spa_plus_obs_nogrid
+
 #***********************************************************************
 
 """
-    Module SpaFunctions
+    Module SPAFunctions
 
 Functions for numerical tests of the SPA++ (modified Synchrotron Polarization Analysis)
     perfromed in Pavaskar et al. (2024) [DOI: 10.3847/1538-4357/ad5af5].
@@ -236,6 +237,14 @@ function spa_plus_obs(ii_map::Matx, qq_map::Matx, uu_map::Matx, spotsize::Intege
         phi_s, sxx_fn = get_sxx(ii_spt, qq_spt, uu_spt)
         fpar_fn[:,i,j] = get_spap_fit(phi_s, sxx_fn)
     end
+    return fpar_fn
+end
+
+function spa_plus_obs_nogrid(ii_map::Matx, qq_map::Matx, uu_map::Matx)::Vect
+
+    phi_s, sxx_fn = get_sxx(ii_map, qq_map, uu_map)
+    fpar_fn = get_spap_fit(phi_s, sxx_fn)
+
     return fpar_fn
 end
 

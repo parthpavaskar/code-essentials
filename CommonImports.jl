@@ -6,15 +6,14 @@ using Statistics, Distributions, FFTW, Random, FITSIO, LsqFit
 using Interpolations, Polynomials, LinearAlgebra, StaticArrays
 
 # DATA PACKAGES
-using HDF5, DataFrames, Images, FortranFiles, DelimitedFiles
+using HDF5, Images, FortranFiles, DelimitedFiles
 
 # PLOTTING PACKAGES
 using PyPlot, LaTeXStrings, PyCall
 
 # MULTI-THREADING
-using Base
-using FLoops
+using Base, FLoops
 
 # CUSTOM PACKAGES
-push!(LOAD_PATH, expanduser("/home/cronus/data/pavaskar/codes/code_essentials/"))
-using DataStruct, BaseIO, ArrayFunctions, TurbAnalysis, DecompMHD, ShockFind
+push!(LOAD_PATH, expanduser("~/work/scripts/code_essentials/"))
+using DataStruct, BaseIO, ArrayFunctions, TurbAnalysis, DecompMHD
