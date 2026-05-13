@@ -18,10 +18,11 @@ using DecompMHD
 
 export energy_spectrum_all
 export oned_energy_spectrum, oned_energy_spectrum_para, oned_energy_spectrum_perp
-export twod_energy_spectrum, fourier_filter_2D, fourier_filter_3D
+export twod_energy_spectrum, oned_energy_spectrum_matx, oned_psd_matx
+export fourier_filter_2D, fourier_filter_3D
 export get_ma_dv, get_ma_db, get_ma2d_dv, get_ma2d_db, get_ms, entot, entot_weighted
 export get_enfrac_ac, get_enfrac_asf, get_enfrac_asf_total, enfrac_vs_time
-export sf2d
+export sf2d, pairwise_annular_average
 
 #***********************************************************************
 
@@ -226,6 +227,62 @@ function twod_energy_spectrum(u::Cube, v::Cube, w::Cube)::Matx
     [Pk[k, kbins[i,j] + 1] += power_spectrum[i,j,k] for k in 1:nz, j in 1:ny, i in 1:nx]
 
     return Pk[div(nz,2)+2:end, 2:div(nx,2)]
+end
+
+function oned_energy_spectrum_matx(map::Matx)::Vect
+    
+    # Perform FFT on each component of the field
+    map_fft = fft(map)
+
+    # Compute the power spectrum
+    power_spectrum = fftshift(abs2.(map_fft))
+    
+    # Average over spherical shells
+    nx, ny = size(map)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kx_g, ky_g = meshgrid_2D(kx, ky)
+    
+    ksq = kx_g.^2 .+ ky_g.^2
+    kbins = round.(Int, sqrt.(ksq))
+
+    Pk = zeros(maximum(kbins) + 1)
+    [Pk[kbins[i,j] + 1] += power_spectrum[i,j] for j in 1:ny, i in 1:nx]
+    
+    return Pk
+end
+
+
+function oned_psd_matx(map::Matx)::Vect
+    
+    # Perform FFT on each component of the field
+    map_fft = fft(map)
+
+    # Compute the power spectrum
+    power_spectrum = fftshift(abs2.(map_fft))
+    
+    # Average over spherical shells
+    nx, ny = size(map)
+    kx = collect(0:nx-1) .- (nx / 2)
+    ky = collect(0:ny-1) .- (ny / 2)
+    kx_g, ky_g = meshgrid_2D(kx, ky)
+    ksq = kx_g.^2 .+ ky_g.^2
+    kbins = round.(Int, sqrt.(ksq))
+
+    n_bins = maximum(kbins) + 1
+    Pk = zeros(n_bins)
+    counts = zeros(Int, n_bins)
+
+    # Bin power and count number of modes in each shell
+    for j in 1:ny, i in 1:nx
+        k = kbins[i, j] + 1
+        Pk[k] += power_spectrum[i, j]
+        counts[k] += 1
+    end
+
+    PSD = Pk ./ counts
+
+    return PSD
 end
 
 
@@ -582,6 +639,45 @@ function structure_function_2d(vx::Cube, vy::Cube, vz::Cube, max_separation::Int
     end
     
     return sf
+end
+
+function pairwise_annular_average(map::Matx, inner_radius::Int, outer_radius::Int)::Matx
+    result = similar(map)
+    
+    for i in 1:size(map, 1)
+        for j in 1:size(map, 2)
+            # Region of interest (ROI) based on inner and outer limit
+            inner_square = max(1, i - inner_radius)
+            outer_square = min(size(map, 1), i + outer_radius)
+            
+            inner_radius_squared = inner_radius^2
+            outer_radius_squared = outer_radius^2
+            
+            # Calculate the pairwise annular average for the current pixel
+            total_sum = zero(typeof(map[1,1]))
+            count = 0
+            
+            for x in inner_square:outer_square
+                for y in max(1, j - outer_radius):min(size(map, 2), j + outer_radius)
+                    # Check if the indices are within the valid range
+                    if x >= 1 && x <= size(map, 1) && y >= 1 && y <= size(map, 2)
+                        distance_squared = (i - x)^2 + (j - y)^2
+                        #print(distance_squared)
+                        
+                        if distance_squared >= inner_radius_squared && distance_squared <= outer_radius_squared
+                            total_sum += map[x, y]
+                            count += 1
+                        end
+                    end
+                end
+            end
+            
+            # Calculate the average and store it in the result matrix
+            result[i, j] = count == 0 ? zero(typeof(map[1,1])) : total_sum / count
+        end
+    end
+    
+    return result
 end
 
 
