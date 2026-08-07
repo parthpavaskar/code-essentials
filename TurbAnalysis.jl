@@ -680,5 +680,51 @@ function pairwise_annular_average(map::Matx, inner_radius::Int, outer_radius::In
     return result
 end
 
+function kurtosis_3d(iv, jv, kv)
+    nx, ny, nz = size(iv)
+    max_sep = div(nx, 2)
+    
+    # Initialize structure function arrays for each velocity component
+    kurt_vol = zeros(Float64, div(max_sep, 2))
+    
+    for (i, dr) in enumerate(1:2:max_sep)
+
+            #du_x = circshift(iv, (-dr, 0, 0)) .- iv
+            #dv_x = circshift(jv, (-dr, 0, 0)) .- jv
+            #dw_x = circshift(kv, (-dr, 0, 0)) .- kv
+
+            du_y = circshift(iv, (0, -dr, 0)) .- iv
+            dv_y = circshift(jv, (0, -dr, 0)) .- jv
+            dw_y = circshift(kv, (0, -dr, 0)) .- kv
+
+     	    ds2y = du_y.^2 .+ dv_y.^2 .+ dw_y.^2
+            ds4y = du_y.^4 .+ dv_y.^4 .+ dw_y.^4
+
+	    du_y = dv_y = dw_y = nothing;
+	    GC.gc()
+
+	    kurt_y = mean(ds4y) ./ mean(ds2y).^2
+
+            du_z = circshift(iv, (0, 0, -dr)) .- iv
+            dv_z = circshift(jv, (0, 0, -dr)) .- jv
+            dw_z = circshift(kv, (0, 0, -dr)) .- kv
+
+	    ds2z = du_z.^2 .+ dv_z.^2 .+ dw_z.^2
+	    ds4z = du_z.^4 .+ dv_z.^4 .+ dw_z.^4
+
+	    dy_z = dv_z = dw_z = nothing;
+	    GC.gc()
+	    
+	    kurt_z = mean(ds4z) ./ mean(ds2z).^2
+
+	    kurt_t = (kurt_y + kurt_z) / 2
+	    #kurt_vol[i] = sum(kurt_t .> 3.0)
+	    kurt_vol[i] = kurt_t
+
+    end
+    
+    return kurt_vol
+end
+
 
 end #top
