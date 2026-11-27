@@ -29,6 +29,7 @@ export gpluto_vis_gif_imshow2D
 export gpluto_get_kinetic_energy_density
 export gpluto_get_magnetic_energy_density
 export gpluto_get_thermal_energy_density
+export gpluto_particles_integrate_spectra
 
 #***********************************************************************
 
@@ -55,22 +56,22 @@ end
 
 
 function gpluto_get_pfields_dbl()
-    pid = 1:1
-    ppos = 2:4
-    ptinj = 5:5
-    pcolor = 6:11
-    pchi = 12:139
-    peng = 140:268
-    pnmicro = 269:269
-    pdensity = 270:270
-    ppressure = 271:271
-    plorg = 272:272
-    pcr = 273:273
-    pflag = 274:274
-    pflagprv = 275:275
-    pshkgrad = 276:276
-    pvu = 277:285
-    pvd = 286:294
+    pid = 1:2
+    ppos = 3:5
+    ptinj = 6:6
+    pcolor = 7:12
+    pchi = 13:140
+    peng = 141:269
+    pnmicro = 270:270
+    pdensity = 271:271
+    ppressure = 272:272
+    plorg = 273:273
+    pcr = 274:274
+    pflag = 275:275
+    pflagprv = 276:276
+    pshkgrad = 277:277
+    pvu = 278:286
+    pvd = 287:295
     return (; pid, ppos, ptinj, pcolor, pchi, peng, pnmicro, pdensity, ppressure, plorg, pcr, pflag, pflagprv, pshkgrad, pvu, pvd)
 end
 
@@ -232,9 +233,9 @@ function gpluto_read_particles_bin(file_dir::String, timestep::Int; get_header::
     end
 
     if get_header
-        return header, data_merged'
+        return header, Float64.(data_merged')
     else
-        return data_merged'
+        return Float64.(data_merged')
     end
     GC.gc()
 end
@@ -319,5 +320,22 @@ end
 function gpluto_get_thermal_energy_density(glob_data, tstep, nx)
     return gpluto_get_thermal_energy_density(glob_data, tstep, nx, nx, nx)
 end
+
+function gpluto_particles_integrate_spectra(chi_np::Vect, eng_np::Vect, density_np::Float64)::Float64
+    Neng_sum = 0.0
+    
+    # chi_np = chi(pc, np)
+    # eng_np = eng(pc, np)
+    
+    for e in 1:128
+        scrh = chi_np[e] * (eng_np[e + 1] - eng_np[e])
+        Emid = 0.5 * (eng_np[e] + eng_np[e + 1])
+        Neng_sum += scrh * Emid
+    end
+    
+    return Neng_sum * density_np
+end
+
+
 
 end # module gPLUTOFunctions
